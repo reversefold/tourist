@@ -213,6 +213,8 @@ require(
         /**/
 
         var svg = d3.select("svg#shards");
+        svg.attr("width", 30 + shards.length * 310);
+
         var shard = svg.selectAll("g.shard").data(shards, function(d) { return d.name });
 
         shard.select("rect.shard");
@@ -421,14 +423,16 @@ require(
       var nf = 1;
 
       function demo() {
+        var num_shards = 4;
+        var num_colls = 10;
         var shards = [];
-        _.each(['a', 'b', 'c'], function(ch) {
+        for (var s = 0; s < num_shards; ++s) {
           shards.push({
-            name: "shard-" + ch,
+            name: "shard-" + String.fromCharCode('a'.charCodeAt(0) + s),
             collections: [],
           });
-        });
-        for (var i = 1; i <= 10; ++i) {
+        }
+        for (var i = 1; i <= num_colls; ++i) {
           _.each(shards, function(shard) {
             var coll = {
               name: "collection-" + i,
@@ -453,7 +457,7 @@ require(
           nf = 0;
           migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
           if (migrating_type == "moveChunk.start") {
-            mig_coll = Math.floor(Math.random() * 10) + 1;
+            mig_coll = Math.floor(Math.random() * num_colls) + 1;
             shards_shuffled = _.shuffle(shards);
             mig_from = shards_shuffled[0].name;
             mig_to = shards_shuffled[1].name;
