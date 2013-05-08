@@ -15,19 +15,11 @@ require(
       $.QueryString = new QueryString(window.location.search);
       $.FragmentString = new QueryString(window.location.hash);
 
-      // stage
-      //config_url = "http://172.30.72.33:28019/";
-      // stagemini
-      //config_url = "http://172.30.68.116:28019/";
-      // live
-      //config_url = "http://172.30.73.210:28019/";
-      // test
-      var config_url;// = "http://172.30.71.37:28019/";
+      var config_url;
 
       var requests = 0;
       $.jsonp_ajax = function(opts) {
         requests += 1;
-        //console.log("+1 " + requests);
         jopts = {
           type: 'GET',
           url: opts.url,
@@ -38,7 +30,6 @@ require(
           success: function(data) {
             opts.success(data);
             requests -= 1;
-            //console.log("-1 " + requests);
           },
           error: function(jqXHR, textStatus, errorThrown) {
             if (console && console.log) {
@@ -121,7 +112,6 @@ require(
               var starts = data.rows.filter(function(r) { return r.what == 'moveChunk.start' || r.what == 'moveChunk.commit' });
               if (starts.length > 0) {
                 var start = starts.slice(-1)[0];
-                //console.log(start.ns);
                 var migrating_type = start.what;
                 var migrating_coll = start.ns.split('.').slice(1).join('.');
                 var migrating_from = start.details.from;
