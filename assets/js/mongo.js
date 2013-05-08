@@ -86,6 +86,13 @@ require(
         });
       }
 
+      var start;
+      var migrating_type = "moveChunk.commit";
+      var migrating_coll;
+      var migrating_from;
+      var migrating_to;
+      var migrating_time;
+
       function update_shards() {
         if (requests > 0) {
           return;
@@ -111,12 +118,12 @@ require(
               changelog.text(function(d) { return JSON.stringify(d, null, '  ') });
               var starts = data.rows.filter(function(r) { return r.what == 'moveChunk.start' || r.what == 'moveChunk.commit' });
               if (starts.length > 0) {
-                var start = starts.slice(-1)[0];
-                var migrating_type = start.what;
-                var migrating_coll = start.ns.split('.').slice(1).join('.');
-                var migrating_from = start.details.from;
-                var migrating_to = start.details.to;
-                var migrating_time = new Date(start.time['$date']);
+                start = starts.slice(-1)[0];
+                migrating_type = start.what;
+                migrating_coll = start.ns.split('.').slice(1).join('.');
+                migrating_from = start.details.from;
+                migrating_to = start.details.to;
+                migrating_time = new Date(start.time['$date']);
                 if (migrating_type == "moveChunk.commit" && (new Date() - migrating_time) > 60000) {
                   migrating_type = '';
                   migrating_coll = '';
@@ -125,11 +132,11 @@ require(
                   migrating_time = '';
                 }
               } else {
-                var migrating_type = '';
-                var migrating_coll = '';
-                var migrating_from = '';
-                var migrating_to = '';
-                var migrating_time = '';
+                migrating_type = '';
+                migrating_coll = '';
+                migrating_from = '';
+                migrating_to = '';
+                migrating_time = '';
               }
 
               var shard_chunks = [];
@@ -178,6 +185,7 @@ require(
                       }
                       shard.collections.push(coll);
                     }
+
                     shards.push(shard);
                   });
 
@@ -214,6 +222,8 @@ require(
 
         var svg = d3.select("svg#shards");
         svg.attr("width", 30 + shards.length * 310);
+
+        svg.select("rect.migrator");
 
         var shard = svg.selectAll("g.shard").data(shards, function(d) { return d.name });
 
@@ -323,6 +333,7 @@ require(
           style("fill", function(d) { return d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88") : "#8888FF" })
         ;
 
+        /*
         colls_g.append("rect").
           attr("class", "pulse").
           attr("rx", 10).
@@ -347,8 +358,9 @@ require(
           attr("width", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0 : 280) : 0 }).
           attr("height", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0 : 50) : 0 }).
           style("opacity", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0.5 : 0.0) : 0.0 })
-//          style("fill", function(d) { return d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88") : "#8888FF" })
+          //style("fill", function(d) { return d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88") : "#8888FF" })
         ;
+        */
 
         colls_g.append("text").
           attr("class", "name").
@@ -380,10 +392,10 @@ require(
           text(function(d) {
             return (d.migrating ?
                     (Math.floor((new Date() - d.migrating_time) / 1000) + "s ago")
-                   : "");
+                    : "");
           })
         ;
-
+        /*
         colls_g.append("text").
           attr("class", "migration").
           attr("y", 30)
@@ -393,7 +405,7 @@ require(
           text(function(d) {
             return (d.migrating ?
                     (d.migrating_role == "from" ? "→" : (d.migrating_role == "to" ? "←" : "?"))
-                   : "");
+                    : "");
           }).
           style("font-size", "150%").
           attr("x", function(d) { return d.migrating_role == "from" ? 130 : 180 }).
@@ -402,7 +414,8 @@ require(
           duration(750).
           attr("x", function(d) { return d.migrating_role == "from" ? 180 : 130 })
         ;
-  /*
+        */
+        /*
         colls_g.append("g").
           attr("class", "arrow").
           attr("transform", "translate(150, 21)").
@@ -412,8 +425,45 @@ require(
           style("stroke", "rgb(20, 20, 20)").
           style("stroke-width", 1)
         ;
-  */
+        */
         colls.exit().remove();
+
+        var mig_data;
+        if (migrating_from) {
+          mig_data = [{
+            from: migrating_from,
+            to: migrating_to,
+            from_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_from})[0]),
+            to_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_to})[0]),
+          }];
+        } else {
+          mig_data = [];
+        }
+        var migrator = svg.selectAll("rect.migrator").data(mig_data);
+        migrator.enter().
+          append("rect").
+          attr("class", "migrator").
+          attr("width", 280).
+          attr("height", 50).
+          attr("rx", 10).
+          attr("ry", 10).
+//          style("opacity", 0.2).
+//          style("fill", "#000000")
+          style("stroke", "#4444ff").
+          style("stroke-width", 3).
+          style("fill", "none")
+        ;
+
+        migrator.
+          attr("x", function(d) { return 10 + 10 + 10 + d.from_i * 310 }).
+          attr("y", 10 + 10 + 10).
+          transition().
+          duration(750).
+          delay(250).
+          attr("x", function(d) { return 10 + 10 + 10 + d.to_i * 310 })
+        ;
+
+        migrator.exit().remove();
       }
 
       var update_interval;
@@ -444,11 +494,6 @@ require(
       }
 
       var migrating_type = "moveChunk.commit";
-      var mig_coll;
-      var shards_shuffled;
-      var mig_from;
-      var mig_to;
-      var migrating_time;
       var nf = 1;
 
       function demo() {
@@ -467,9 +512,9 @@ require(
               name: "collection-" + i,
               nchunks: 42,
             };
-            if (i == mig_coll) {
-              var from = shard.name == mig_from;
-              var to = shard.name == mig_to;
+            if (i == migrating_coll) {
+              var from = shard.name == migrating_from;
+              var to = shard.name == migrating_to;
               if (from || to) {
                 coll.migrating = true;
                 coll.migrating_type = migrating_type;
@@ -486,10 +531,10 @@ require(
           nf = 0;
           migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
           if (migrating_type == "moveChunk.start") {
-            mig_coll = Math.floor(Math.random() * num_colls) + 1;
-            shards_shuffled = _.shuffle(shards);
-            mig_from = shards_shuffled[0].name;
-            mig_to = shards_shuffled[1].name;
+            migrating_coll = Math.floor(Math.random() * num_colls) + 1;
+            var shards_shuffled = _.shuffle(shards);
+            migrating_from = shards_shuffled[0].name;
+            migrating_to = shards_shuffled[1].name;
             migrating_time = new Date();
           }
         }
