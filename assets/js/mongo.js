@@ -103,7 +103,7 @@ require(
             get_last_n("config", "changelog", 5, function(data) {
               var rows = data.rows.slice();
               rows.reverse();
-              var changelog = d3.selectAll("pre.changelog").data([rows]);
+              var changelog = d3.select("div#display").selectAll("pre.changelog").data([rows]);
               changelog.enter().append("pre").
                 attr("class", "changelog span4").
                 style("font-size", "75%")
