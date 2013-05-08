@@ -284,6 +284,7 @@ require(
         ;
 
         colls.select("rect.collection");
+        colls.select("rect.pulse");
         colls.select("text.name");
         colls.select("text.nchunks");
         colls.select("text.migration");
@@ -320,6 +321,33 @@ require(
           transition().
           duration(750).
           style("fill", function(d) { return d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88") : "#8888FF" })
+        ;
+
+        colls_g.append("rect").
+          attr("class", "pulse").
+          attr("rx", 10).
+          attr("ry", 10).
+          attr("width", 280).
+          attr("height", 50).
+          style("opacity", 0)
+        ;
+
+        colls.selectAll("rect.pulse").
+          style("fill", "#000000").
+          attr("x", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0 : 140) : 0 }).
+          attr("y", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0 : 25) : 0 }).
+          attr("width", function(d) { return d.migrating ? (d.migrating_role == "from" ? 280 : 0) : 0 }).
+          attr("height", function(d) { return d.migrating ? (d.migrating_role == "from" ? 50 : 0) : 0 }).
+          style("opacity", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0.0 : 0.5) : 0.0 }).
+          transition().
+          delay(function(d) {return d.migrating ? (d.migrating_role == "from" ? 0 : 500) : 0 }).
+          duration(750).
+          attr("x", function(d) { return d.migrating ? (d.migrating_role == "from" ? 140 : 0) : 0 }).
+          attr("y", function(d) { return d.migrating ? (d.migrating_role == "from" ? 25 : 0) : 0 }).
+          attr("width", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0 : 280) : 0 }).
+          attr("height", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0 : 50) : 0 }).
+          style("opacity", function(d) { return d.migrating ? (d.migrating_role == "from" ? 0.5 : 0.0) : 0.0 })
+//          style("fill", function(d) { return d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88") : "#8888FF" })
         ;
 
         colls_g.append("text").
@@ -370,6 +398,7 @@ require(
           style("font-size", "150%").
           attr("x", function(d) { return d.migrating_role == "from" ? 130 : 180 }).
           transition().
+          delay(function(d) {return d.migrating ? (d.migrating_role == "from" ? 0 : 500) : 0 }).
           duration(750).
           attr("x", function(d) { return d.migrating_role == "from" ? 180 : 130 })
         ;
