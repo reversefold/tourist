@@ -178,15 +178,9 @@ require(
                       }
                       shard.collections.push(coll);
                     }
-                    shard.collections.sort(function(a, b) {
-                      return (a.migrating == b.migrating
-                              ? a.name.localeCompare(b.name)
-                              : ((b.migrating ? 1 : 0) - (a.migrating ? 1 : 0)));
-                    });
                     shards.push(shard);
                   });
 
-                  shards.sort(function(a, b) { return a.name > b.name });
                   update_view(shards);
                 });
             });
@@ -195,6 +189,15 @@ require(
       }
 
       function update_view(shards) {
+        shards.sort(function(a, b) { return a.name > b.name });
+        _.each(shards, function(shard) {
+          shard.collections.sort(function(a, b) {
+            return (a.migrating == b.migrating
+                    ? a.name.localeCompare(b.name)
+                    : ((b.migrating ? 1 : 0) - (a.migrating ? 1 : 0)));
+          });
+        });
+
         var updated = d3.select("#collapsed-nav").selectAll("li.updated").
           data([new Date()]);
         updated.enter().append("li").attr("class", "updated").
@@ -382,14 +385,18 @@ require(
         colls.exit().remove();
       }
 
+      var update_interval;
+      var demo_interval;
+
       function begin(config_host, config_port) {
+        if (demo_interval) {
+          $("div#demo_header").remove();
+          clearInterval(demo_interval);
+        }
+
         config_url = "http://" + config_host + ":" + config_port + "/";
 
         $("div#settings").addClass("collapse");
-
-        d3.select("div#display").append("svg").attr("id", "shards").
-          attr("class", "span10").
-          attr("width", "1000").attr("height", "600");
 
         /*
         var shards = [
@@ -402,7 +409,57 @@ require(
         */
 
         update_shards();
-        setInterval(update_shards, 5000);
+        update_interval = setInterval(update_shards, 5000);
+      }
+
+      var migrating_type = "moveChunk.commit";
+      var mig_coll;
+      var shards_shuffled;
+      var mig_from;
+      var mig_to;
+      var migrating_time;
+      var nf = 1;
+
+      function demo() {
+        var shards = [];
+        _.each(['a', 'b', 'c'], function(ch) {
+          shards.push({
+            name: "shard-" + ch,
+            collections: [],
+          });
+        });
+        for (var i = 1; i <= 10; ++i) {
+          _.each(shards, function(shard) {
+            var coll = {
+              name: "collection-" + i,
+              nchunks: 42,
+            };
+            if (i == mig_coll) {
+              var from = shard.name == mig_from;
+              var to = shard.name == mig_to;
+              if (from || to) {
+                coll.migrating = true;
+                coll.migrating_type = migrating_type;
+                coll.migrating_role = from ? "from" : (to ? "to" : "?");
+                coll.migrating_time = migrating_time;
+              }
+            }
+            shard.collections.push(coll);
+          });
+        }
+        update_view(shards);
+        ++nf;
+        if (nf == 2) {
+          nf = 0;
+          migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
+          if (migrating_type == "moveChunk.start") {
+            mig_coll = Math.floor(Math.random() * 10) + 1;
+            shards_shuffled = _.shuffle(shards);
+            mig_from = shards_shuffled[0].name;
+            mig_to = shards_shuffled[1].name;
+            migrating_time = new Date();
+          }
+        }
       }
 
       d3.select("#collapsed-nav").selectAll("li.version").data([
@@ -443,6 +500,10 @@ require(
         begin($.QueryString.value("config_host"), $.QueryString.value("config_port"));
       } else if ($.FragmentString.value("config_host") && $.FragmentString.value("config_port")) {
         begin($.FragmentString.value("config_host"), $.FragmentString.value("config_port"));
+      } else {
+        $("div#display").before("<div id='demo_header' class='row'><div class='span2'><h2>Demo</h2></div></div>");
+        demo();
+        demo_interval = setInterval(demo, 2000);
       }
 
       $("input#config_host").onEnterKey(function() {
