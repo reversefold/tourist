@@ -516,8 +516,8 @@ require(
           }).
           style("opacity", 0).
           style("fill", "rgb(220, 60, 60)").
-          style("stroke", "rgb(250, 90, 90)").
-          style("stroke-width", 1).
+          //style("stroke", "rgb(220, 60, 60)").
+          //style("stroke-width", 1).
           transition().
           delay(500).
           style("opacity", 1)
