@@ -199,12 +199,31 @@ require(
       function update_view(shards) {
         shards.sort(function(a, b) { return a.name > b.name });
         _.each(shards, function(shard) {
+          shard.i = _.indexOf(shards, shard);
           shard.collections.sort(function(a, b) {
             return (a.migrating == b.migrating
                     ? a.name.localeCompare(b.name)
                     : ((b.migrating ? 1 : 0) - (a.migrating ? 1 : 0)));
           });
         });
+
+        var mig_data;
+        if (migrating_from) {
+          mig_data = {
+            from: migrating_from,
+            to: migrating_to,
+            from_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_from})[0]),
+            to_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_to})[0]),
+          };
+          mig_data.from_x = 10 + 10 + 10 + mig_data.from_i * 310;
+          mig_data.to_x = 10 + 10 + 10 + mig_data.to_i * 310;
+          mig_data.from_x_edge = mig_data.from_x + (mig_data.from_i < mig_data.to_i ? 280 : 0);
+          mig_data.to_x_edge = mig_data.to_x + (mig_data.from_i < mig_data.to_i ? 0 : 280);
+          mig_data.dir = mig_data.to_i - mig_data.from_i > 0 ? 1 : -1;
+          mig_data = [mig_data];
+        } else {
+          mig_data = [];
+        }
 
         var updated = d3.select("#collapsed-nav").selectAll("li.updated").
           data([new Date()]);
@@ -232,8 +251,19 @@ require(
 
         var shard_g = shard.enter().append("g").
           attr("class", "shard").
-          attr("transform", function(d, i) { return "translate(" + (10 + i * 310) + ",10)"})
+          attr("transform", function(d, i) { return "translate(" + (10 + i * 310) + ", 10)"})
         ;
+
+        shard.transition().
+          duration(500).
+          attr("transform", function(d, i) {
+            return "translate(" + (10 + i * 310) + ", " +
+              ((migrating_from && d.i < Math.max(mig_data[0].from_i, mig_data[0].to_i) && d.i > Math.min(mig_data[0].from_i, mig_data[0].to_i))
+               //&& migrating_from != d.name && migrating_to != d.name)
+               ? 10 + 10 + 10 + 50
+               : 10) +
+              ")";
+          });
 
         shard_g.
           append("rect").
@@ -428,18 +458,8 @@ require(
         */
         colls.exit().remove();
 
-        var mig_data;
-        if (migrating_from) {
-          mig_data = [{
-            from: migrating_from,
-            to: migrating_to,
-            from_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_from})[0]),
-            to_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_to})[0]),
-          }];
-        } else {
-          mig_data = [];
-        }
-        var migrator = svg.selectAll("rect.migrator").data(mig_data);
+        /*
+        var migrator = svg.selectAll("rect.migrator").data(mig_data, function(d) { return d });
         migrator.enter().
           append("rect").
           attr("class", "migrator").
@@ -447,23 +467,64 @@ require(
           attr("height", 50).
           attr("rx", 10).
           attr("ry", 10).
-//          style("opacity", 0.2).
-//          style("fill", "#000000")
+          //style("opacity", 0.2).
+          //style("fill", "#000000")
           style("stroke", "#4444ff").
           style("stroke-width", 3).
-          style("fill", "none")
+          style("fill", "none").
+          style("opacity", 0).
+          transition().
+          style("opacity", 0.8)
         ;
 
         migrator.
-          attr("x", function(d) { return 10 + 10 + 10 + d.from_i * 310 }).
+          attr("x", function(d) { return d.from_x }).
           attr("y", 10 + 10 + 10).
           transition().
           duration(750).
           delay(250).
-          attr("x", function(d) { return 10 + 10 + 10 + d.to_i * 310 })
+          attr("x", function(d) { return d.to_x })
         ;
 
-        migrator.exit().remove();
+        migrator.exit().transition().style("opacity", 0).remove();
+        */
+
+        var migrator = svg.selectAll("path.migrator").data(mig_data, function(d) { return d.from_i + " " + d.to_i });
+        migrator.enter().
+          append("path").
+          attr("class", "migrator").
+          attr("d", function(d) {
+            var y1 = 10 + 10 + 10 + 25 - 5;
+            var y2 = 10 + 10 + 10 + 25 - 10;
+            var y3 = 10 + 10 + 10 + 25;
+            var y4 = 10 + 10 + 10 + 25 + 10;
+            var y5 = 10 + 10 + 10 + 25 + 5;
+            var x1 = d.from_x_edge;
+            var x2 = d.to_x_edge - d.dir * 15;
+            var x3 = d.to_x_edge;
+            return "M" +
+              x1 + " " + y1 + " " +
+              x2 + " " + y1 + " " +
+              x2 + " " + y2 + " " +
+              x3 + " " + y3 + " " +
+              x2 + " " + y4 + " " +
+              x2 + " " + y5 + " " +
+              x1 + " " + y5 + " " +
+              x1 + " " + y1;
+            ;
+          }).
+          style("opacity", 0).
+          style("fill", "rgb(200, 60, 60)").
+          style("stroke", "rgb(230, 90, 90)").
+          style("stroke-width", 1).
+          transition().
+          delay(500).
+          style("opacity", 0.8)
+        ;
+        migrator.exit().
+          transition().
+          style("opacity", 0).
+          remove();
       }
 
       var update_interval;
