@@ -307,7 +307,7 @@ require(
           })
         ;
 
-        svg.attr("height", max_height + 30);
+        svg.attr("height", max_height + 10 + 10 + 10 + 10 + 50);
 
         shard_g.append("text").
           attr("x", 10)
