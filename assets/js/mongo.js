@@ -93,6 +93,8 @@ require(
       var migrating_to;
       var migrating_time;
 
+      var shards = [];
+
       function update_shards() {
         if (requests > 0) {
           return;
@@ -149,14 +151,17 @@ require(
                   shard_chunks[row.shard].push(row);
                 },
                 function() {
-                  var shards = [];
+                  var new_shards = [];
                   _.each(shards_data.rows, function(row) {
-                    var shard = {
-                      name: row._id,
-                      host: row.host,
-                      collections: [],
-                      chunks: shard_chunks[row._id],
-                    };
+                    var shard = _.find(shards, function(c) { return c.name == row._id });
+                    if (!shard) {
+                      shard = {
+                        name: row._id,
+                        host: row.host,
+                        collections: [],
+                      };
+                    }
+                    shard.chunks = shard_chunks[row._id];
 
                     collection_names = [];
                     _.each(shard.chunks, function(chunk) {
@@ -168,26 +173,43 @@ require(
                       collection_names[name] = num + 1;
                     });
 
+                    var new_collections = [];
                     for (var name in collection_names) {
-                      coll = {
-                        name: name,
-                        nchunks: collection_names[name],
-                      };
+                      var coll = _.find(shard.collections, function(c) { return c.name == name });
+                      if (!coll) {
+                        coll = {
+                          name: name,
+                          migrating: false,
+                          migrated: false,
+                        };
+                      }
+                      coll.nchunks = collection_names[name];
                       if (name == migrating_coll) {
                         var from = shard.name == migrating_from;
                         var to = shard.name == migrating_to;
                         if (from || to) {
                           coll.migrating = true;
+                          coll.migrated = false;
                           coll.migrating_type = migrating_type;
                           coll.migrating_role = from ? "from" : (to ? "to" : "?");
                           coll.migrating_time = migrating_time;
+                        } else if (coll.migrating) {
+                          coll.migrated = true;
+                          coll.migrated_time = new Date();
+                          coll.migrating = false;
                         }
+                      } else if (coll.migrating) {
+                        coll.migrated = true;
+                        coll.migrated_time = new Date();
+                        coll.migrating = false;
                       }
-                      shard.collections.push(coll);
+                      new_collections.push(coll);
                     }
+                    shard.collections = new_collections;
 
-                    shards.push(shard);
+                    new_shards.push(shard);
                   });
+                  shards = new_shards;
 
                   update_view(shards);
                 });
@@ -202,7 +224,11 @@ require(
           shard.i = _.indexOf(shards, shard);
           shard.collections.sort(function(a, b) {
             return (a.migrating == b.migrating
-                    ? a.name.localeCompare(b.name)
+                    ? (a.migrated == b.migrated
+                       ? (a.migrating_time == b.migrating_time
+                          ? a.name.localeCompare(b.name)
+                          : b.migrating_time - a.migrating_time)
+                       : ((b.migrated ? 1 : 0) - (a.migrated ? 1 : 0)))
                     : ((b.migrating ? 1 : 0) - (a.migrating ? 1 : 0)));
           });
         });
@@ -357,10 +383,18 @@ require(
           attr("height", 50)
         ;
 
+        var now = new Date();
+        var interpolate = d3.interpolateRgb("#88FF88", "#8888FF");
         colls.selectAll("rect.collection").
           transition().
           duration(750).
-          style("fill", function(d) { return d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88") : "#8888FF" })
+          style("fill", function(d) {
+            var t = (1 - 5000 / ((now - d.migrated_time) / 4 + 5000));
+            return (d.migrated
+                    ? interpolate(t)
+                    : (d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88")
+                       : "#8888FF"))
+          })
         ;
 
         /*
@@ -420,11 +454,12 @@ require(
 
         colls.selectAll("text.migrationAgo").
           text(function(d) {
-            return (d.migrating ?
+            return (d.migrating  || d.migrated ?
                     (Math.floor((new Date() - d.migrating_time) / 1000) + "s ago")
                     : "");
           })
         ;
+
         /*
         colls_g.append("text").
           attr("class", "migration").
@@ -456,6 +491,7 @@ require(
           style("stroke-width", 1)
         ;
         */
+
         colls.exit().remove();
 
         /*
@@ -532,6 +568,7 @@ require(
       var demo_interval;
 
       function begin(config_host, config_port) {
+        shards = [];
         if (demo_interval) {
           $("div#demo_header").remove();
           clearInterval(demo_interval);
@@ -561,33 +598,60 @@ require(
       function demo() {
         var num_shards = 4;
         var num_colls = 10;
-        var shards = [];
+        //var shards = [];
+        var new_shards = [];
         for (var s = 0; s < num_shards; ++s) {
-          shards.push({
-            name: "shard-" + String.fromCharCode('a'.charCodeAt(0) + s),
-            collections: [],
-          });
+          var name = "shard-" + String.fromCharCode('a'.charCodeAt(0) + s);
+          var shard = _.find(shards, function(s) { return s.name == name });
+          if (!shard) {
+            shard = {
+              name: name,
+              collections: [],
+            }
+          }
+          new_shards.push(shard);
         }
-        for (var i = 1; i <= num_colls; ++i) {
-          _.each(shards, function(shard) {
-            var coll = {
-              name: "collection-" + i,
-              nchunks: 42,
-            };
+        shards = new_shards;
+
+        _.each(shards, function(shard) {
+          var new_collections = [];
+          for (var i = 1; i <= num_colls; ++i) {
+            var name = "collection-" + i;
+            var coll = _.find(shard.collections, function(c) { return c.name == name });
+            if (!coll) {
+              coll = {
+                name: name,
+                nchunks: 42,
+                migrating: false,
+                migrated: false,
+              };
+            }
             if (i == migrating_coll) {
               var from = shard.name == migrating_from;
               var to = shard.name == migrating_to;
               if (from || to) {
                 coll.migrating = true;
+                coll.migrated = false;
                 coll.migrating_type = migrating_type;
                 coll.migrating_role = from ? "from" : (to ? "to" : "?");
                 coll.migrating_time = migrating_time;
+              } else if (coll.migrating) {
+                coll.migrated = true;
+                coll.migrated_time = new Date();
+                coll.migrating = false;
               }
+            } else if (coll.migrating) {
+              coll.migrated = true;
+              coll.migrated_time = new Date();
+              coll.migrating = false;
             }
-            shard.collections.push(coll);
-          });
-        }
+            new_collections.push(coll);
+          }
+          shard.collections = new_collections;
+        });
+
         update_view(shards);
+
         ++nf;
         if (nf == 2) {
           nf = 0;
