@@ -205,6 +205,18 @@ require(
                       }
                       new_collections.push(coll);
                     }
+                    if ((shard.name == migrating_to || shard.name == migrating_from)
+                        && !_.find(new_collections, function(c) { return c.name == migrating_coll})) {
+                      new_collections.push({
+                        name: migrating_coll,
+                        migrating: true,
+                        migrated: false,
+                        nchunks: 0,
+                        migrating_type: migrating_type,
+                        migrating_role: from ? "from" : (to ? "to" : "?"),
+                        migrating_time: migrating_time,
+                      });
+                    }
                     shard.collections = new_collections;
 
                     new_shards.push(shard);
