@@ -494,13 +494,13 @@ require(
           append("path").
           attr("class", "migrator").
           attr("d", function(d) {
-            var y1 = 10 + 10 + 10 + 25 - 5;
+            var y1 = 10 + 10 + 10 + 25 - 4;
             var y2 = 10 + 10 + 10 + 25 - 12;
             var y3 = 10 + 10 + 10 + 25;
             var y4 = 10 + 10 + 10 + 25 + 12;
-            var y5 = 10 + 10 + 10 + 25 + 5;
+            var y5 = 10 + 10 + 10 + 25 + 4;
             var x1 = d.from_x_edge;
-            var x2 = d.to_x_edge - d.dir * 15;
+            var x2 = d.to_x_edge - d.dir * 14;
             var x3 = d.to_x_edge - d.dir * 17;
             var x4 = d.to_x_edge;
             return "M" +
@@ -520,7 +520,7 @@ require(
           style("stroke-width", 1).
           transition().
           delay(500).
-          style("opacity", 0.8)
+          style("opacity", 1)
         ;
         migrator.exit().
           transition().
