@@ -495,27 +495,28 @@ require(
           attr("class", "migrator").
           attr("d", function(d) {
             var y1 = 10 + 10 + 10 + 25 - 5;
-            var y2 = 10 + 10 + 10 + 25 - 10;
+            var y2 = 10 + 10 + 10 + 25 - 12;
             var y3 = 10 + 10 + 10 + 25;
-            var y4 = 10 + 10 + 10 + 25 + 10;
+            var y4 = 10 + 10 + 10 + 25 + 12;
             var y5 = 10 + 10 + 10 + 25 + 5;
             var x1 = d.from_x_edge;
             var x2 = d.to_x_edge - d.dir * 15;
-            var x3 = d.to_x_edge;
+            var x3 = d.to_x_edge - d.dir * 17;
+            var x4 = d.to_x_edge;
             return "M" +
               x1 + " " + y1 + " " +
               x2 + " " + y1 + " " +
-              x2 + " " + y2 + " " +
-              x3 + " " + y3 + " " +
-              x2 + " " + y4 + " " +
+              x3 + " " + y2 + " " +
+              x4 + " " + y3 + " " +
+              x3 + " " + y4 + " " +
               x2 + " " + y5 + " " +
               x1 + " " + y5 + " " +
               x1 + " " + y1;
             ;
           }).
           style("opacity", 0).
-          style("fill", "rgb(200, 60, 60)").
-          style("stroke", "rgb(230, 90, 90)").
+          style("fill", "rgb(220, 60, 60)").
+          style("stroke", "rgb(250, 90, 90)").
           style("stroke-width", 1).
           transition().
           delay(500).
