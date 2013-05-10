@@ -93,8 +93,6 @@ require(
       var migrating_to;
       var migrating_time;
 
-      var shards = [];
-
       function update_shards() {
         if (requests > 0) {
           return;
@@ -117,6 +115,7 @@ require(
                 attr("class", "changelog span4").
                 style("font-size", "75%")
               ;
+
               changelog.text(function(d) { return JSON.stringify(d, null, '  ') });
               var starts = data.rows.filter(function(r) { return r.what == 'moveChunk.start' || r.what == 'moveChunk.commit' });
               if (starts.length > 0) {
@@ -153,18 +152,19 @@ require(
                 function() {
                   var new_shards = [];
                   _.each(shards_data.rows, function(row) {
-                    var shard = _.find(shards, function(c) { return c.name == row._id });
+                    var shard = shards.find(function(c) { return c.get("name") == row._id });
                     if (!shard) {
-                      shard = {
+                      shard = new Shard({
                         name: row._id,
                         host: row.host,
-                        collections: [],
-                      };
+                      });
                     }
-                    shard.chunks = shard_chunks[row._id];
+                    shard.set("chunks", shard_chunks[row._id]);
+                    var from = shard.get("name") == migrating_from;
+                    var to = shard.get("name") == migrating_to;
 
                     collection_names = [];
-                    _.each(shard.chunks, function(chunk) {
+                    _.each(shard.get("chunks"), function(chunk) {
                       name = chunk.ns.split('.').slice(1).join('.');
                       num = collection_names[name];
                       if (num == undefined) {
@@ -175,53 +175,31 @@ require(
 
                     var new_collections = [];
                     for (var name in collection_names) {
-                      var coll = _.find(shard.collections, function(c) { return c.name == name });
+                      var coll = shard.get("collections").find(function(c) { return c.get("name") == name });
                       if (!coll) {
-                        coll = {
+                        coll = new Collection({
                           name: name,
-                          migrating: false,
-                          migrated: false,
-                        };
+                        });
                       }
-                      coll.nchunks = collection_names[name];
-                      if (name == migrating_coll) {
-                        var from = shard.name == migrating_from;
-                        var to = shard.name == migrating_to;
-                        if (from || to) {
-                          coll.migrating = true;
-                          coll.migrated = false;
-                          coll.migrating_type = migrating_type;
-                          coll.migrating_role = from ? "from" : (to ? "to" : "?");
-                          coll.migrating_time = migrating_time;
-                        } else if (coll.migrating) {
-                          coll.migrated = true;
-                          coll.migrated_time = new Date();
-                          coll.migrating = false;
-                        }
-                      } else if (coll.migrating) {
-                        coll.migrated = true;
-                        coll.migrated_time = new Date();
-                        coll.migrating = false;
-                      }
+                      coll.set("nchunks", collection_names[name]);
+                      coll.set_migrating(migrating_coll, migrating_type, from, to, migrating_time);
                       new_collections.push(coll);
                     }
-                    if ((shard.name == migrating_to || shard.name == migrating_from)
-                        && !_.find(new_collections, function(c) { return c.name == migrating_coll})) {
-                      new_collections.push({
+
+                    if ((from || to)
+                        && !_.find(new_collections, function(c) { return c.get("name") == migrating_coll})) {
+                      var coll = new Collection({
                         name: migrating_coll,
-                        migrating: true,
-                        migrated: false,
                         nchunks: 0,
-                        migrating_type: migrating_type,
-                        migrating_role: from ? "from" : (to ? "to" : "?"),
-                        migrating_time: migrating_time,
                       });
+                      coll.set_migrating(migrating_coll, migrating_type, from, to, migrating_time);
+                      new_collections.push(coll);
                     }
-                    shard.collections = new_collections;
+                    shard.get("collections").reset(new_collections);
 
                     new_shards.push(shard);
                   });
-                  shards = new_shards;
+                  shards.reset(new_shards);
 
                   update_view(shards);
                 });
@@ -231,18 +209,8 @@ require(
       }
 
       function update_view(shards) {
-        shards.sort(function(a, b) { return a.name > b.name });
-        _.each(shards, function(shard) {
-          shard.i = _.indexOf(shards, shard);
-          shard.collections.sort(function(a, b) {
-            return (a.migrating == b.migrating
-                    ? (a.migrated == b.migrated
-                       ? (a.migrating_time == b.migrating_time
-                          ? a.name.localeCompare(b.name)
-                          : b.migrating_time - a.migrating_time)
-                       : ((b.migrated ? 1 : 0) - (a.migrated ? 1 : 0)))
-                    : ((b.migrating ? 1 : 0) - (a.migrating ? 1 : 0)));
-          });
+        shards.each(function(shard) {
+          shard.set("i", shards.indexOf(shard));
         });
 
         var mig_data;
@@ -250,8 +218,8 @@ require(
           mig_data = {
             from: migrating_from,
             to: migrating_to,
-            from_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_from})[0]),
-            to_i: _.indexOf(shards, _.filter(shards, function(s) { return s.name == migrating_to})[0]),
+            from_i: shards.indexOf(shards.filter(function(s) { return s.get("name") == migrating_from})[0]),
+            to_i: shards.indexOf(shards.filter(function(s) { return s.get("name") == migrating_to})[0]),
           };
           mig_data.from_x = 10 + 10 + 10 + mig_data.from_i * 310;
           mig_data.to_x = 10 + 10 + 10 + mig_data.to_i * 310;
@@ -282,7 +250,7 @@ require(
 
         svg.select("rect.migrator");
 
-        var shard = svg.selectAll("g.shard").data(shards, function(d) { return d.name });
+        var shard = svg.selectAll("g.shard").data(shards.models, function(d) { return d.get("name") });
 
         shard.select("rect.shard");
         shard.select("text");
@@ -296,8 +264,7 @@ require(
           duration(500).
           attr("transform", function(d, i) {
             return "translate(" + (10 + i * 310) + ", " +
-              ((migrating_from && d.i < Math.max(mig_data[0].from_i, mig_data[0].to_i) && d.i > Math.min(mig_data[0].from_i, mig_data[0].to_i))
-               //&& migrating_from != d.name && migrating_to != d.name)
+              ((migrating_from && d.get("i") < Math.max(mig_data[0].from_i, mig_data[0].to_i) && d.get("i") > Math.min(mig_data[0].from_i, mig_data[0].to_i))
                ? 10 + 10 + 10 + 50
                : 10) +
               ")";
@@ -339,7 +306,7 @@ require(
         max_height = 500;
         svg.selectAll("rect.shard").
           attr("height", function(d) {
-            computed_height = d.collections.length * 60 + 10;
+            computed_height = d.get("collections").length * 60 + 10;
             max_height = Math.max(max_height, computed_height);
             return Math.max(500, computed_height);
           })
@@ -352,13 +319,13 @@ require(
         ;
 
         shard_g.selectAll("text").
-          text(function(d) { return d.name })
+          text(function(d) { return d.get("name") })
         ;
 
         shard.exit().remove();
 
         var colls = shard.selectAll("g.collection").
-          data(function(d) { return d.collections }, function(d) { return d.name })
+          data(function(d) { return d.get("collections").models }, function(d) { return d.get("name") })
         ;
 
         colls.select("rect.collection");
@@ -401,10 +368,10 @@ require(
           transition().
           duration(750).
           style("fill", function(d) {
-            var t = (1 - 5000 / ((now - d.migrated_time) / 4 + 5000));
-            return (d.migrated
+            var t = (1 - 5000 / ((now - d.get("migrated_time")) / 4 + 5000));
+            return (d.get("migrated")
                     ? interpolate(t)
-                    : (d.migrating ? (d.migrating_type == "moveChunk.start" ? "#FFFF88" : "#88FF88")
+                    : (d.get("migrating") ? (d.get("migrating_type") == "moveChunk.start" ? "#FFFF88" : "#88FF88")
                        : "#8888FF"))
           })
         ;
@@ -445,7 +412,7 @@ require(
         ;
 
         colls.selectAll("text.name").
-          text(function(d) { return d.name })
+          text(function(d) { return d.get("name") })
         ;
 
         colls_g.append("text").
@@ -455,7 +422,7 @@ require(
         ;
 
         colls.selectAll("text.nchunks").
-          text(function(d) { return "chunks: " + d.nchunks })
+          text(function(d) { return "chunks: " + d.get("nchunks") })
         ;
 
         colls_g.append("text").
@@ -466,8 +433,8 @@ require(
 
         colls.selectAll("text.migrationAgo").
           text(function(d) {
-            return (d.migrating  || d.migrated ?
-                    (Math.floor((new Date() - d.migrating_time) / 1000) + "s ago")
+            return (d.get("migrating")  || d.get("migrated") ?
+                    (Math.floor((new Date() - d.get("migrating_time")) / 1000) + "s ago")
                     : "");
           })
         ;
@@ -580,7 +547,7 @@ require(
       var demo_interval;
 
       function begin(config_host, config_port) {
-        shards = [];
+        shards.reset();
         if (demo_interval) {
           $("div#demo_header").remove();
           clearInterval(demo_interval);
@@ -614,52 +581,34 @@ require(
         var new_shards = [];
         for (var s = 0; s < num_shards; ++s) {
           var name = "shard-" + String.fromCharCode('a'.charCodeAt(0) + s);
-          var shard = _.find(shards, function(s) { return s.name == name });
+          var shard = shards.find(function(s) { return s.get("name") == name });
           if (!shard) {
-            shard = {
+            shard = new Shard({
               name: name,
-              collections: [],
-            }
+            });
           }
           new_shards.push(shard);
         }
-        shards = new_shards;
+        shards.reset(new_shards);
 
-        _.each(shards, function(shard) {
+        shards.each(function(shard) {
+          var from = shard.get("name") == migrating_from;
+          var to = shard.get("name") == migrating_to;
           var new_collections = [];
           for (var i = 1; i <= num_colls; ++i) {
             var name = "collection-" + i;
-            var coll = _.find(shard.collections, function(c) { return c.name == name });
+            var coll = shard.get("collections").find(function(c) { return c.get("name") == name });
             if (!coll) {
-              coll = {
+              coll = new Collection({
                 name: name,
                 nchunks: 42,
-                migrating: false,
-                migrated: false,
-              };
+              });
             }
-            if (i == migrating_coll) {
-              var from = shard.name == migrating_from;
-              var to = shard.name == migrating_to;
-              if (from || to) {
-                coll.migrating = true;
-                coll.migrated = false;
-                coll.migrating_type = migrating_type;
-                coll.migrating_role = from ? "from" : (to ? "to" : "?");
-                coll.migrating_time = migrating_time;
-              } else if (coll.migrating) {
-                coll.migrated = true;
-                coll.migrated_time = new Date();
-                coll.migrating = false;
-              }
-            } else if (coll.migrating) {
-              coll.migrated = true;
-              coll.migrated_time = new Date();
-              coll.migrating = false;
-            }
+
+            coll.set_migrating(migrating_coll, migrating_type, from, to, migrating_time);
             new_collections.push(coll);
           }
-          shard.collections = new_collections;
+          shard.get("collections").reset(new_collections);
         });
 
         update_view(shards);
@@ -669,10 +618,10 @@ require(
           nf = 0;
           migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
           if (migrating_type == "moveChunk.start") {
-            migrating_coll = Math.floor(Math.random() * num_colls) + 1;
-            var shards_shuffled = _.shuffle(shards);
-            migrating_from = shards_shuffled[0].name;
-            migrating_to = shards_shuffled[1].name;
+            migrating_coll = shards.first().get("collections").at(Math.floor(Math.random() * shards.first().get("collections").length)).get("name");
+            var shuffled_shards = shards.shuffle();
+            migrating_from = shuffled_shards[0].get("name");
+            migrating_to = shuffled_shards[1].get("name");
             migrating_time = new Date();
           }
         }
@@ -686,31 +635,65 @@ require(
       ]).enter().append("li").attr("class", "version").
         append("a").append("small").text(function(d) { return d });
 
-      /*
       var Shard = Backbone.Model.extend({
         defaults: function() {
           return {
-            name: '<unnamed>',
-            collections: [],
-          };
-        }
-      });
-
-      var Collection = Backbone.Model.extend({
-        defaults: function() {
-          return {
-            name: '<unnamed>',
-            documents: 0,
+            name: '<none>',
+            host: null,
+            collections: new CollectionList(),
+            chunks: [],
+            i: -1,
           };
         }
       });
 
       var ShardsList = Backbone.Collection.extend({
         model: Shard,
+        comparator: function(a, b) { return a.name > b.name }
       });
 
-      //var shards = new ShardsList();
-      */
+      var Collection = Backbone.Model.extend({
+        defaults: function() {
+          return {
+            name: '<none>',
+            documents: 0,
+            nchunks: 0,
+            migrating: false,
+            migrated: false,
+            migrating_type: "",
+            migrating_role: "",
+            migrating_time: null,
+          };
+        },
+        set_migrating: function(coll, type, from, to, time) {
+          if (this.get("name") == coll && (from || to)) {
+            this.set("migrating", true);
+            this.set("migrated", false);
+            this.set("migrating_type", type);
+            this.set("migrating_role", from ? "from" : (to ? "to" : "?"));
+            this.set("migrating_time", time);
+          } else if (this.get("migrating")) {
+            this.set("migrated", true);
+            this.set("migrated_time", new Date());
+            this.set("migrating", false);
+          }
+        },
+      });
+
+      var CollectionList = Backbone.Collection.extend({
+        model: Collection,
+        comparator: function(a, b) {
+          return (a.get("migrating") == b.get("migrating")
+                  ? (a.get("migrated") == b.get("migrated")
+                     ? (a.get("migrating_time") == b.get("migrating_time")
+                        ? a.get("name").localeCompare(b.get("name"))
+                        : b.get("migrating_time") - a.get("migrating_time"))
+                     : ((b.get("migrated") ? 1 : 0) - (a.get("migrated") ? 1 : 0)))
+                  : ((b.get("migrating") ? 1 : 0) - (a.get("migrating") ? 1 : 0)));
+        },
+      });
+
+      var shards = new ShardsList();
 
       if ($.QueryString.value("config_host") && $.QueryString.value("config_port")) {
         begin($.QueryString.value("config_host"), $.QueryString.value("config_port"));
