@@ -43,10 +43,20 @@ require(
             migrating_type: "",
             migrating_role: "",
             migrating_time: null,
+            migrated_time: null,
+            migrating_elapsed: 0,
           };
         },
         set_migrating: function(coll, type, from, to, time) {
           if (this.get("name") == coll && (from || to)) {
+            if (this.get("migrating") && this.get("migrating_type") != type) {
+              console.log(this.get("migrating"));
+              console.log(this.get("migrating_type"));
+              console.log(type);
+              console.log(this.get("migrating_time"));
+              console.log(time - this.get("migrating_time"));
+              this.set("migrating_elapsed", time - this.get("migrating_time"));
+            }
             this.set("migrating", true);
             this.set("migrated", false);
             this.set("migrating_type", type);
@@ -395,6 +405,7 @@ require(
         colls.select("text.nchunks");
         colls.select("text.migration");
         colls.select("text.migrationAgo");
+        colls.select("text.migrationElapsed");
 
         var colls_g = colls.enter().append("g").
           attr("class", "collection").
@@ -489,13 +500,27 @@ require(
         colls_g.append("text").
           attr("class", "migrationAgo").
           attr("x", 210).
-          attr("y", 30)
+          attr("y", 20)
         ;
 
         colls.selectAll("text.migrationAgo").
           text(function(d) {
-            return (d.get("migrating")  || d.get("migrated") ?
+            return (d.get("migrating") || d.get("migrated") ?
                     (Math.floor((new Date() - d.get("migrating_time")) / 1000) + "s ago")
+                    : "");
+          })
+        ;
+
+        colls_g.append("text").
+          attr("class", "migrationElapsed").
+          attr("x", 210).
+          attr("y", 40)
+        ;
+
+        colls.selectAll("text.migrationElapsed").
+          text(function(d) {
+            return (d.get("migrating_elapsed") ?
+                    (Math.floor(d.get("migrating_elapsed") / 1000) + "s tot")
                     : "");
           })
         ;
@@ -672,12 +697,12 @@ require(
         if (nf == 2) {
           nf = 0;
           migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
+          migrating_time = new Date();
           if (migrating_type == "moveChunk.start") {
             migrating_coll = shards.first().get("collections").at(Math.floor(Math.random() * shards.first().get("collections").length)).get("name");
             var shuffled_shards = shards.shuffle();
             migrating_from = shuffled_shards[0].get("name");
             migrating_to = shuffled_shards[1].get("name");
-            migrating_time = new Date();
           }
         }
       }
