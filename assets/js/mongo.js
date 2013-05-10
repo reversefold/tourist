@@ -15,9 +15,77 @@ require(
       $.QueryString = new QueryString(window.location.search);
       $.FragmentString = new QueryString(window.location.hash);
 
-      var config_url;
+      var Shard = Backbone.Model.extend({
+        defaults: function() {
+          return {
+            name: '<none>',
+            host: null,
+            collections: new CollectionList(),
+            chunks: [],
+            i: -1,
+          };
+        }
+      });
 
+      var ShardsList = Backbone.Collection.extend({
+        model: Shard,
+        comparator: function(a, b) { return a.name > b.name }
+      });
+
+      var Collection = Backbone.Model.extend({
+        defaults: function() {
+          return {
+            name: '<none>',
+            documents: 0,
+            nchunks: 0,
+            migrating: false,
+            migrated: false,
+            migrating_type: "",
+            migrating_role: "",
+            migrating_time: null,
+          };
+        },
+        set_migrating: function(coll, type, from, to, time) {
+          if (this.get("name") == coll && (from || to)) {
+            this.set("migrating", true);
+            this.set("migrated", false);
+            this.set("migrating_type", type);
+            this.set("migrating_role", from ? "from" : (to ? "to" : "?"));
+            this.set("migrating_time", time);
+          } else if (this.get("migrating")) {
+            this.set("migrated", true);
+            this.set("migrated_time", new Date());
+            this.set("migrating", false);
+          }
+        },
+      });
+
+      var CollectionList = Backbone.Collection.extend({
+        model: Collection,
+        comparator: function(a, b) {
+          return (a.get("migrating") == b.get("migrating")
+                  ? (a.get("migrated") == b.get("migrated")
+                     ? (a.get("migrating_time") == b.get("migrating_time")
+                        ? a.get("name").localeCompare(b.get("name"))
+                        : b.get("migrating_time") - a.get("migrating_time"))
+                     : ((b.get("migrated") ? 1 : 0) - (a.get("migrated") ? 1 : 0)))
+                  : ((b.get("migrating") ? 1 : 0) - (a.get("migrating") ? 1 : 0)));
+        },
+      });
+
+      var shards = new ShardsList();
+      var config_url;
       var requests = 0;
+      var start;
+      var migrating_type = "moveChunk.commit";
+      var migrating_coll;
+      var migrating_from;
+      var migrating_to;
+      var migrating_time;
+      var update_interval;
+      var demo_interval;
+      var nf = 1;
+
       $.jsonp_ajax = function(opts) {
         requests += 1;
         jopts = {
@@ -85,13 +153,6 @@ require(
           get_rows(db, collection, Math.max(1, num - n), success_func);
         });
       }
-
-      var start;
-      var migrating_type = "moveChunk.commit";
-      var migrating_coll;
-      var migrating_from;
-      var migrating_to;
-      var migrating_time;
 
       function update_shards() {
         if (requests > 0) {
@@ -543,9 +604,6 @@ require(
           remove();
       }
 
-      var update_interval;
-      var demo_interval;
-
       function begin(config_host, config_port) {
         shards.reset();
         if (demo_interval) {
@@ -570,9 +628,6 @@ require(
         update_shards();
         update_interval = setInterval(update_shards, 5000);
       }
-
-      var migrating_type = "moveChunk.commit";
-      var nf = 1;
 
       function demo() {
         var num_shards = 4;
@@ -634,66 +689,6 @@ require(
         "Backbone: " + Backbone.VERSION,
       ]).enter().append("li").attr("class", "version").
         append("a").append("small").text(function(d) { return d });
-
-      var Shard = Backbone.Model.extend({
-        defaults: function() {
-          return {
-            name: '<none>',
-            host: null,
-            collections: new CollectionList(),
-            chunks: [],
-            i: -1,
-          };
-        }
-      });
-
-      var ShardsList = Backbone.Collection.extend({
-        model: Shard,
-        comparator: function(a, b) { return a.name > b.name }
-      });
-
-      var Collection = Backbone.Model.extend({
-        defaults: function() {
-          return {
-            name: '<none>',
-            documents: 0,
-            nchunks: 0,
-            migrating: false,
-            migrated: false,
-            migrating_type: "",
-            migrating_role: "",
-            migrating_time: null,
-          };
-        },
-        set_migrating: function(coll, type, from, to, time) {
-          if (this.get("name") == coll && (from || to)) {
-            this.set("migrating", true);
-            this.set("migrated", false);
-            this.set("migrating_type", type);
-            this.set("migrating_role", from ? "from" : (to ? "to" : "?"));
-            this.set("migrating_time", time);
-          } else if (this.get("migrating")) {
-            this.set("migrated", true);
-            this.set("migrated_time", new Date());
-            this.set("migrating", false);
-          }
-        },
-      });
-
-      var CollectionList = Backbone.Collection.extend({
-        model: Collection,
-        comparator: function(a, b) {
-          return (a.get("migrating") == b.get("migrating")
-                  ? (a.get("migrated") == b.get("migrated")
-                     ? (a.get("migrating_time") == b.get("migrating_time")
-                        ? a.get("name").localeCompare(b.get("name"))
-                        : b.get("migrating_time") - a.get("migrating_time"))
-                     : ((b.get("migrated") ? 1 : 0) - (a.get("migrated") ? 1 : 0)))
-                  : ((b.get("migrating") ? 1 : 0) - (a.get("migrating") ? 1 : 0)));
-        },
-      });
-
-      var shards = new ShardsList();
 
       if ($.QueryString.value("config_host") && $.QueryString.value("config_port")) {
         begin($.QueryString.value("config_host"), $.QueryString.value("config_port"));
