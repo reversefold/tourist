@@ -50,11 +50,6 @@ require(
         set_migrating: function(coll, type, from, to, time) {
           if (this.get("name") == coll && (from || to)) {
             if (this.get("migrating") && this.get("migrating_type") != type) {
-              console.log(this.get("migrating"));
-              console.log(this.get("migrating_type"));
-              console.log(type);
-              console.log(this.get("migrating_time"));
-              console.log(time - this.get("migrating_time"));
               this.set("migrating_elapsed", time - this.get("migrating_time"));
             }
             this.set("migrating", true);
@@ -499,28 +494,30 @@ require(
 
         colls_g.append("text").
           attr("class", "migrationAgo").
-          attr("x", 210).
+          style("font-size", "80%").
+          attr("x", 200).
           attr("y", 20)
         ;
 
         colls.selectAll("text.migrationAgo").
           text(function(d) {
             return (d.get("migrating") || d.get("migrated") ?
-                    (Math.floor((new Date() - d.get("migrating_time")) / 1000) + "s ago")
+                    (timeFormat(Math.floor((new Date() - d.get("migrating_time")) / 1000)) + " ago")
                     : "");
           })
         ;
 
         colls_g.append("text").
           attr("class", "migrationElapsed").
-          attr("x", 210).
+          style("font-size", "80%").
+          attr("x", 200).
           attr("y", 40)
         ;
 
         colls.selectAll("text.migrationElapsed").
           text(function(d) {
             return (d.get("migrating_elapsed") ?
-                    (Math.floor(d.get("migrating_elapsed") / 1000) + "s tot")
+                    (timeFormat(Math.floor(d.get("migrating_elapsed") / 1000)) + " tot")
                     : "");
           })
         ;
@@ -652,6 +649,18 @@ require(
 
         update_shards();
         update_interval = setInterval(update_shards, 5000);
+      }
+
+      function timeFormat(secs) {
+        var str = "";
+        var minutes = Math.floor(secs / 60);
+        secs = secs % 60;
+        var hours = Math.floor(minutes / 60);
+        minutes = minutes % 60;
+        return ((hours ? hours + "h" : "") +
+                (minutes ? minutes + "m" : "") +
+                secs + "s"
+               );
       }
 
       function demo() {
