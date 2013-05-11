@@ -721,13 +721,15 @@ require(
       }
 
       d3.select("#collapsed-nav").selectAll("li.version").data([
-        "jQuery: " + $.fn.jquery,
-        "d3: " + d3.version,
-        "underscore: " + _.VERSION,
-        "Backbone: " + Backbone.VERSION,
-        "moment: " + moment.version,
-      ]).enter().append("li").attr("class", "version").
-        append("a").append("small").text(function(d) { return d });
+        {n: "jQuery", v: $.fn.jquery, l: "https://jquery.org/"},
+        {n: "d3", v: d3.version, l: "http://d3js.org/"},
+        {n: "underscore", v: _.VERSION, l: "http://underscorejs.org/"},
+        {n: "Backbone", v: Backbone.VERSION, l: "http://backbonejs.org/"},
+        {n: "moment", v: moment.version, l: "http://momentjs.com/"},
+      ]).enter().
+        append("li").attr("class", "version").
+        append("a").attr("href", function(d) { return d.l }).
+        append("small").text(function(d) { return d.n + ": " + d.v });
 
       if ($.QueryString.value("config_host") && $.QueryString.value("config_port")) {
         begin($.QueryString.value("config_host"), $.QueryString.value("config_port"));
