@@ -1,6 +1,6 @@
 require(
-  ["jquery", "d3.v3", "backbone", "underscore", "querystring"],
-  function($, d3, Backbone, _, QueryString) {
+  ["jquery", "d3.v3", "backbone", "underscore", "querystring", "moment"],
+  function($, d3, Backbone, _, QueryString, moment) {
     $(function() {
       $.fn.onEnterKey = function(closure) {
         $(this).keypress(
@@ -59,7 +59,7 @@ require(
             this.set("migrating_time", time);
           } else if (this.get("migrating")) {
             this.set("migrated", true);
-            this.set("migrated_time", new Date());
+            this.set("migrated_time", moment());
             this.set("migrating", false);
           }
         },
@@ -190,8 +190,8 @@ require(
                 migrating_coll = start.ns.split('.').slice(1).join('.');
                 migrating_from = start.details.from;
                 migrating_to = start.details.to;
-                migrating_time = new Date(start.time['$date']);
-                if (migrating_type == "moveChunk.commit" && (new Date() - migrating_time) > 60000) {
+                migrating_time = moment(start.time['$date']);
+                if (migrating_type == "moveChunk.commit" && (moment() - migrating_time) > 60000) {
                   migrating_type = '';
                   migrating_coll = '';
                   migrating_from = '';
@@ -298,12 +298,13 @@ require(
         }
 
         var updated = d3.select("#collapsed-nav").selectAll("li.updated").
-          data([new Date()]);
+          data([moment()]);
         updated.enter().append("li").attr("class", "updated").
           append("a").append("small");
         updated.select("small");
         updated.selectAll("small").
-          text(function(d) { return "Last refresh: " + d });
+          text(function(d) { return "Last refresh: " + d.format("MMMM Do YYYY, h:mm:ss a") })
+        ;
 
         /** /
         var success = d3.selectAll("pre.shardsData").data([shards]);
@@ -429,7 +430,7 @@ require(
           attr("height", 50)
         ;
 
-        var now = new Date();
+        var now = moment();
         var interpolate = d3.interpolateRgb("#88FF88", "#8888FF");
         colls.selectAll("rect.collection").
           transition().
@@ -495,14 +496,16 @@ require(
         colls_g.append("text").
           attr("class", "migrationAgo").
           style("font-size", "80%").
-          attr("x", 200).
+          style("text-anchor", "end").
+          attr("x", 270).
           attr("y", 20)
         ;
 
         colls.selectAll("text.migrationAgo").
           text(function(d) {
             return (d.get("migrating") || d.get("migrated") ?
-                    (timeFormat(Math.floor((new Date() - d.get("migrating_time")) / 1000)) + " ago")
+                    d.get("migrating_time").fromNow()
+                    //(timeFormat(Math.floor((moment() - d.get("migrating_time")) / 1000)) + " ago")
                     : "");
           })
         ;
@@ -510,7 +513,8 @@ require(
         colls_g.append("text").
           attr("class", "migrationElapsed").
           style("font-size", "80%").
-          attr("x", 200).
+          style("text-anchor", "end").
+          attr("x", 270).
           attr("y", 40)
         ;
 
@@ -706,7 +710,7 @@ require(
         if (nf == 2) {
           nf = 0;
           migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
-          migrating_time = new Date();
+          migrating_time = moment();
           if (migrating_type == "moveChunk.start") {
             migrating_coll = shards.first().get("collections").at(Math.floor(Math.random() * shards.first().get("collections").length)).get("name");
             var shuffled_shards = shards.shuffle();
@@ -721,6 +725,7 @@ require(
         "d3: " + d3.version,
         "underscore: " + _.VERSION,
         "Backbone: " + Backbone.VERSION,
+        "moment: " + moment.version,
       ]).enter().append("li").attr("class", "version").
         append("a").append("small").text(function(d) { return d });
 
