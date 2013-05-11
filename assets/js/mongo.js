@@ -49,8 +49,12 @@ require(
         },
         set_migrating: function(coll, type, from, to, time) {
           if (this.get("name") == coll && (from || to)) {
-            if (this.get("migrating") && this.get("migrating_type") != type) {
-              this.set("migrating_elapsed", time - this.get("migrating_time"));
+            if (this.get("migrating")) {
+              if (this.get("migrating_type") == "moveChunk.start") {
+                this.set("migrating_elapsed", moment() - this.get("migrating_time"));
+              } else if (this.get("migrating_type") != type) {
+                this.set("migrating_elapsed", time - this.get("migrating_time"));
+              }
             }
             this.set("migrating", true);
             this.set("migrated", false);
@@ -521,7 +525,7 @@ require(
         colls.selectAll("text.migrationElapsed").
           text(function(d) {
             return (d.get("migrating_elapsed") ?
-                    (timeFormat(Math.floor(d.get("migrating_elapsed") / 1000)) + " tot")
+                    (timeFormat(Math.floor(d.get("migrating_elapsed") / 1000)) + " elapsed")
                     : "");
           })
         ;
@@ -707,7 +711,7 @@ require(
         update_view(shards);
 
         ++nf;
-        if (nf == 2) {
+        if (nf == 4) {
           nf = 0;
           migrating_type = migrating_type == "moveChunk.start" ? "moveChunk.commit" : "moveChunk.start";
           migrating_time = moment();
@@ -738,7 +742,7 @@ require(
       } else {
         $("div#display").before("<div id='demo_header' class='row'><div class='span2'><h2>Demo</h2></div></div>");
         demo();
-        demo_interval = setInterval(demo, 2000);
+        demo_interval = setInterval(demo, 1000);
       }
 
       $("input#config_host").onEnterKey(function() {
