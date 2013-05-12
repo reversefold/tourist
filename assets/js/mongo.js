@@ -195,7 +195,10 @@ require(
                 migrating_from = start.details.from;
                 migrating_to = start.details.to;
                 migrating_time = moment(start.time['$date']);
-                if (migrating_type == "moveChunk.commit" && (moment() - migrating_time) > 60000) {
+                if (migrating_type == "moveChunk.commit"
+                    //TODO: change this to look for a newer
+                    //moveChunk.to or moveChunk.from entry
+                    && (moment() - migrating_time) > 60000) {
                   migrating_type = '';
                   migrating_coll = '';
                   migrating_from = '';
