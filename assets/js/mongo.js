@@ -624,7 +624,9 @@ require(
             ;
           }).
           style("opacity", 0).
-          style("fill", "rgb(220, 60, 60)").
+          style("fill", function(d) {
+            return "url(#progress" + (d.dir > 0 ? "R" : "L") + ")"
+          }). //rgb(220, 60, 60)
           //style("stroke", "rgb(220, 60, 60)").
           //style("stroke-width", 1).
           transition().
@@ -723,6 +725,8 @@ require(
             var shuffled_shards = shards.shuffle();
             migrating_from = shuffled_shards[0].get("name");
             migrating_to = shuffled_shards[1].get("name");
+            //migrating_from = "shard-a";
+            //migrating_to = "shard-d";
           }
         }
       }

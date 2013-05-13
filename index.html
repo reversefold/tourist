@@ -60,7 +60,28 @@
       </div>
     </div>
     <div id="display" style="float: none; margin: auto;">
-      <svg id="shards"/>
+      <svg id="shards">
+        <defs>
+          <linearGradient id="progressR" spreadMethod="repeat" gradientUnits="userSpaceOnUse"
+                          x1="0" x2="24" y2="-16">
+            <animate attributeName="x1" values="0; 32" dur="1000ms" repeatCount="indefinite"/>
+            <animate attributeName="x2" values="16; 48" dur="1000ms" repeatCount="indefinite"/>
+            <stop stop-color="#DC7C7C" offset="10%"/>
+            <stop stop-color="#DC3C3C" offset="40%"/>
+            <stop stop-color="#DC3C3C" offset="70%"/>
+            <stop stop-color="#DC7C7C" offset="100%"/>
+          </linearGradient>
+          <linearGradient id="progressL" spreadMethod="repeat" gradientUnits="userSpaceOnUse"
+                          x1="0" x2="24" y2="-16">
+            <animate attributeName="x1" values="32; 0" dur="1000ms" repeatCount="indefinite"/>
+            <animate attributeName="x2" values="48; 16" dur="1000ms" repeatCount="indefinite"/>
+            <stop stop-color="#DC7C7C" offset="10%"/>
+            <stop stop-color="#DC3C3C" offset="40%"/>
+            <stop stop-color="#DC3C3C" offset="70%"/>
+            <stop stop-color="#DC7C7C" offset="100%"/>
+          </linearGradient>
+        </defs>
+      </svg>
     </div>
     <script src="assets/js/bootstrap.min.js"></script>
   </body>
