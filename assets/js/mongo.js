@@ -48,6 +48,7 @@ require(
           };
         },
         set_migrating: function(coll, type, from, to, time) {
+          this.set("last_update", moment());
           if (this.get("name") == coll && (from || to)) {
             if (this.get("migrating")) {
               if (this.get("migrating_type") == "moveChunk.start") {
@@ -274,7 +275,17 @@ require(
                   });
                   shards.reset(new_shards);
 
-                  update_view(shards);
+
+                  var updated = d3.select("#collapsed-nav").selectAll("li.updated").
+                    data([moment()]);
+                  updated.enter().append("li").attr("class", "updated").
+                    append("a").append("small");
+                  updated.select("small");
+                  updated.selectAll("small").
+                    text(function(d) { return "Last refresh: " + d.format("MMMM Do YYYY, h:mm:ss a") })
+                  ;
+
+                  //update_view(shards);
                 });
             });
           },
@@ -303,15 +314,6 @@ require(
         } else {
           mig_data = [];
         }
-
-        var updated = d3.select("#collapsed-nav").selectAll("li.updated").
-          data([moment()]);
-        updated.enter().append("li").attr("class", "updated").
-          append("a").append("small");
-        updated.select("small");
-        updated.selectAll("small").
-          text(function(d) { return "Last refresh: " + d.format("MMMM Do YYYY, h:mm:ss a") })
-        ;
 
         /** /
         var success = d3.selectAll("pre.shardsData").data([shards]);
@@ -525,11 +527,19 @@ require(
           attr("y", 40)
         ;
 
+        var now = moment();
         colls.selectAll("text.migrationElapsed").
           text(function(d) {
-            return (d.get("migrating_elapsed") ?
-                    (timeFormat(Math.floor(d.get("migrating_elapsed") / 1000)) + " elapsed")
-                    : "");
+            if (d.get("migrating_elapsed")) {
+              if (d.get("migrating_type") == "moveChunk.start") {
+                var delta = now - d.get("last_update");
+              } else {
+                var delta = 0;
+              }
+              return timeFormat(Math.floor((d.get("migrating_elapsed") + delta) / 1000)) + " elapsed"
+            } else {
+              return "";
+            }
           })
         ;
 
@@ -662,6 +672,7 @@ require(
 
         update_shards();
         update_interval = setInterval(update_shards, 5000);
+        update_interval = setInterval(function() { if (shards && shards.length) { update_view(shards) } }, 1000);
       }
 
       function timeFormat(secs) {
